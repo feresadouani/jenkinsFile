@@ -8,11 +8,6 @@ pipeline {
 
     stages {
 
-        stage('Checkout Code') {
-            steps {
-                git branch: 'main', url: 'https://github.com/feresadouani/pipeline.git'
-            }
-        }
 
         stage('Build Maven') {
             steps {
