@@ -10,7 +10,7 @@ pipeline {
 
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/feresadouani/jenkinsFile.git'
+                git branch: 'main', url: 'https://github.com/feresadouani/pipeline.git'
             }
         }
 
@@ -48,14 +48,4 @@ pipeline {
             }
         }
     }
-
-    post {
-        success {
-            echo "🚀 Pipeline finished successfully and image pushed to Docker Hub."
-        }
-        failure {
-            echo "❌ Pipeline failed!"
-        }
-    }
 }
-
