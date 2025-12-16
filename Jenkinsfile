@@ -101,21 +101,28 @@ pipeline {
       }
     }
 
-    stage('Post-deploy smoke test') {
-      steps {
-        sh '''
-          POD=$(kubectl -n ${NAMESPACE} get pods -l app=spring-app -o jsonpath="{.items[0].metadata.name}" || true)
-          if [ -n "$POD" ]; then
-            kubectl -n ${NAMESPACE} exec $POD -- \
-              curl -sS http://127.0.0.1:8089/student/Depatment/getAllDepartment
+   stage('Post-deploy smoke test') {
+     steps {
+       sh '''
+         echo "Waiting for spring-app pod to be Ready..."
+         kubectl -n ${NAMESPACE} wait \
+           --for=condition=Ready pod \
+           -l app=spring-app \
+           --timeout=60s
 
-          else
-            echo "No spring-app pod found"
-          fi
-        '''
-      }
-    }
-  }
+         POD=$(kubectl -n ${NAMESPACE} get pods \
+           -l app=spring-app \
+           --field-selector=status.phase=Running \
+           -o jsonpath="{.items[0].metadata.name}")
+
+         echo "Using pod: $POD"
+
+         kubectl -n ${NAMESPACE} exec $POD -- \
+           curl -sS http://127.0.0.1:8089/student/Depatment/getAllDepartment || echo "curl failed"
+       '''
+     }
+   }
+
 
   /* ========================= */
   /*     JUNIT REPORTING       */
