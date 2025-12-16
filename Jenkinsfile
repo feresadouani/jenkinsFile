@@ -2,11 +2,11 @@ pipeline {
   agent any
 
   environment {
-    DOCKERHUB_REPO = "feresadouani/pipeline"
-    IMAGE_TAG = "${env.BUILD_NUMBER}"
-    NAMESPACE = "devops"
+    DOCKERHUB_REPO    = "feresadouani/pipeline"
+    IMAGE_TAG         = "${env.BUILD_NUMBER}"
+    NAMESPACE         = "devops"
     DOCKERHUB_CRED_ID = "dockerhub"
-    SONAR_CRED_ID = "sonar-token"
+    SONAR_CRED_ID     = "sonar-token"
   }
 
   stages {
@@ -51,7 +51,7 @@ pipeline {
         ]) {
           sh '''
             mvn sonar:sonar \
-              -Dsonar.login=$SONAR_TOKEN \
+              -Dsonar.token=$SONAR_TOKEN \
               -Dsonar.host.url=http://localhost:9000
           '''
         }
@@ -67,6 +67,9 @@ pipeline {
       }
     }
 
+    /* ========================= */
+    /*     DOCKER HUB LOGIN      */
+    /* ========================= */
     stage('Login to Docker Hub') {
       steps {
         withCredentials([
@@ -81,16 +84,19 @@ pipeline {
       }
     }
 
+    /* ========================= */
+    /*     PUSH DOCKER IMAGE     */
+    /* ========================= */
     stage('Push Docker Image') {
       steps {
         sh "docker push ${DOCKERHUB_REPO}:${IMAGE_TAG}"
-        sh "docker tag ${DOCKERHUB_REPO}:${IMAGE_TAG} ${DOCKERHUB_REPO}:latest || true"
-        sh "docker push ${DOCKERHUB_REPO}:latest || true"
+        sh "docker tag ${DOCKERHUB_REPO}:${IMAGE_TAG} ${DOCKERHUB_REPO}:latest"
+        sh "docker push ${DOCKERHUB_REPO}:latest"
       }
     }
 
     /* ========================= */
-    /*     K8S MYSQL SECRET      */
+    /*   K8S MYSQL SECRET        */
     /* ========================= */
     stage('Create/ensure MySQL Secret') {
       steps {
@@ -120,17 +126,29 @@ pipeline {
     }
 
     /* ========================= */
-    /*   SMOKE TEST (K8S NATIVE) */
+    /*   SMOKE TEST (PRO)        */
     /* ========================= */
     stage('Post-deploy smoke test') {
       steps {
         sh """
           kubectl -n ${NAMESPACE} delete pod curl-test --ignore-not-found
+
           kubectl -n ${NAMESPACE} run curl-test \
             --rm -i --restart=Never \
             --image=curlimages/curl \
-            -- \
-            curl -f http://spring-service:8089/student/Depatment/getAllDepartment
+            -- sh -c '
+              echo "Waiting for Spring Boot to be ready...";
+              for i in \$(seq 1 30); do
+                if curl -f http://spring-service:8089/student/Depatment/getAllDepartment; then
+                  echo "✅ Smoke test passed";
+                  exit 0;
+                fi
+                echo "⏳ Not ready yet... retry \$i";
+                sleep 2;
+              done
+              echo "❌ Smoke test failed after timeout";
+              exit 1;
+            '
         """
       }
     }
@@ -141,10 +159,10 @@ pipeline {
       junit 'target/surefire-reports/*.xml'
     }
     success {
-      echo "Pipeline succeeded — image: ${DOCKERHUB_REPO}:${IMAGE_TAG}"
+      echo "✅ Pipeline succeeded — image: ${DOCKERHUB_REPO}:${IMAGE_TAG}"
     }
     failure {
-      echo "Pipeline failed — voir les logs"
+      echo "❌ Pipeline failed — check logs"
     }
   }
 }
