@@ -107,7 +107,7 @@ pipeline {
           POD=$(kubectl -n ${NAMESPACE} get pods -l app=spring-app -o jsonpath="{.items[0].metadata.name}" || true)
           if [ -n "$POD" ]; then
             kubectl -n ${NAMESPACE} exec $POD -- \
-              curl -sS http://127.0.0.1:8089/student/Depatment/getAllDepartment || echo "curl failed"
+              curl -sS http://127.0.0.1:8089/student/Depatment/getAllDepartment
           else
             echo "No spring-app pod found"
           fi
