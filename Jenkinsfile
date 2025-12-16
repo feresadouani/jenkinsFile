@@ -17,6 +17,11 @@ pipeline {
       }
     }
 
+ stage('Maven Tests') {
+      steps {
+        sh 'mvn clean test'
+      }
+    }
     stage('Build Maven') {
       steps {
         sh 'mvn clean package -DskipTests'
@@ -119,7 +124,10 @@ pipeline {
     }
   }
 
-  post {
+post {
+    always {
+      junit 'target/surefire-reports/*.xml'
+    }
     success {
       echo "Pipeline succeeded — image: ${DOCKERHUB_REPO}:${IMAGE_TAG}"
     }
