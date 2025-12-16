@@ -12,6 +12,9 @@ pipeline {
 
   stages {
 
+    /* ========================= */
+    /*         CHECKOUT          */
+    /* ========================= */
     stage('Checkout') {
       steps {
         checkout scm
@@ -32,15 +35,22 @@ pipeline {
     /* ========================= */
     stage('Build Maven') {
       steps {
-        // ⚠️ PAS de clean ici
+        // ⚠️ PAS de clean ici (sinon JUnit disparaît)
         sh 'mvn package -DskipTests'
       }
     }
 
+    /* ========================= */
+    /*        SONARQUBE          */
+    /* ========================= */
     stage('MVN SONARQUBE') {
-      when { expression { return env.SONAR_CRED_ID != null && env.SONAR_CRED_ID != "" } }
+      when {
+        expression { return env.SONAR_CRED_ID != null && env.SONAR_CRED_ID != "" }
+      }
       steps {
-        withCredentials([string(credentialsId: "${SONAR_CRED_ID}", variable: 'SONAR_TOKEN')]) {
+        withCredentials([
+          string(credentialsId: "${SONAR_CRED_ID}", variable: 'SONAR_TOKEN')
+        ]) {
           sh '''
             mvn sonar:sonar \
               -Dsonar.login=$SONAR_TOKEN \
@@ -50,12 +60,18 @@ pipeline {
       }
     }
 
+    /* ========================= */
+    /*        DOCKER BUILD       */
+    /* ========================= */
     stage('Build Docker Image') {
       steps {
         sh "docker build -t ${DOCKERHUB_REPO}:${IMAGE_TAG} ."
       }
     }
 
+    /* ========================= */
+    /*     DOCKER HUB LOGIN      */
+    /* ========================= */
     stage('Login to Docker Hub') {
       steps {
         withCredentials([
@@ -70,6 +86,9 @@ pipeline {
       }
     }
 
+    /* ========================= */
+    /*      PUSH IMAGE           */
+    /* ========================= */
     stage('Push Docker Image') {
       steps {
         sh "docker push ${DOCKERHUB_REPO}:${IMAGE_TAG}"
@@ -78,6 +97,9 @@ pipeline {
       }
     }
 
+    /* ========================= */
+    /*     K8S MYSQL SECRET      */
+    /* ========================= */
     stage('Create/ensure MySQL Secret') {
       steps {
         sh """
@@ -89,40 +111,46 @@ pipeline {
       }
     }
 
+    /* ========================= */
+    /*     DEPLOY TO K8S         */
+    /* ========================= */
     stage('Deploy to Kubernetes') {
       steps {
         sh """
           kubectl -n ${NAMESPACE} apply -f k8s/ --recursive || true
-          kubectl -n ${NAMESPACE} set image deployment/spring-app spring-app=${DOCKERHUB_REPO}:${IMAGE_TAG} || true
-          kubectl -n ${NAMESPACE} rollout status deployment/spring-app --timeout=120s || true
+          kubectl -n ${NAMESPACE} set image deployment/spring-app spring-app=${DOCKERHUB_REPO}:${IMAGE_TAG}
+          kubectl -n ${NAMESPACE} rollout status deployment/spring-app --timeout=120s
           kubectl -n ${NAMESPACE} get pods -o wide
           kubectl -n ${NAMESPACE} get svc
         """
       }
     }
 
-   stage('Post-deploy smoke test') {
-     steps {
-       sh '''
-         echo "Waiting for spring-app pod to be Ready..."
-         kubectl -n ${NAMESPACE} wait \
-           --for=condition=Ready pod \
-           -l app=spring-app \
-           --timeout=60s
+    /* ========================= */
+    /*     SMOKE TEST (FIXED)    */
+    /* ========================= */
+    stage('Post-deploy smoke test') {
+      steps {
+        sh '''
+          echo "Waiting for spring-app pod to be READY..."
+          kubectl -n ${NAMESPACE} wait \
+            --for=condition=Ready pod \
+            -l app=spring-app \
+            --timeout=60s
 
-         POD=$(kubectl -n ${NAMESPACE} get pods \
-           -l app=spring-app \
-           --field-selector=status.phase=Running \
-           -o jsonpath="{.items[0].metadata.name}")
+          POD=$(kubectl -n ${NAMESPACE} get pods \
+            -l app=spring-app \
+            --field-selector=status.phase=Running \
+            -o jsonpath="{.items[0].metadata.name}")
 
-         echo "Using pod: $POD"
+          echo "Testing pod: $POD"
 
-         kubectl -n ${NAMESPACE} exec $POD -- \
-           curl -sS http://127.0.0.1:8089/student/Depatment/getAllDepartment || echo "curl failed"
-       '''
-     }
-   }
-
+          kubectl -n ${NAMESPACE} exec $POD -- \
+            curl -sS http://127.0.0.1:8089/student/Depatment/getAllDepartment || echo "curl failed"
+        '''
+      }
+    }
+  }
 
   /* ========================= */
   /*     JUNIT REPORTING       */
