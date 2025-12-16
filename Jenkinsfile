@@ -122,21 +122,18 @@ pipeline {
     /* ========================= */
     /*   SMOKE TEST (PRO)        */
     /* ========================= */
-    stage('Post-deploy smoke test') {
-      steps {
-        sh '''
-          echo "Waiting for service to be reachable..."
-          sleep 10
+   stage('Post-deploy smoke test') {
+     steps {
+       sh '''
+         kubectl -n devops run curl-test \
+           --rm -i --restart=Never \
+           --image=curlimages/curl \
+           -- \
+           curl -f http://spring-service:8089/student/Depatment/getAllDepartment
+       '''
+     }
+   }
 
-          MINIKUBE_IP=$(minikube ip)
-          echo "Minikube IP: $MINIKUBE_IP"
-
-          curl -sS http://$MINIKUBE_IP:30080/student/Depatment/getAllDepartment \
-            || echo "Smoke test failed"
-        '''
-      }
-    }
-  }
 
   post {
     always {
