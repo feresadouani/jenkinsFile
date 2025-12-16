@@ -76,7 +76,7 @@ pipeline {
             passwordVariable: 'DOCKER_PASS'
           )
         ]) {
-          sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
+          sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
         }
       }
     }
@@ -120,20 +120,21 @@ pipeline {
     }
 
     /* ========================= */
-    /*   SMOKE TEST (PRO)        */
+    /*   SMOKE TEST (K8S NATIVE) */
     /* ========================= */
-   stage('Post-deploy smoke test') {
-     steps {
-       sh '''
-         kubectl -n devops run curl-test \
-           --rm -i --restart=Never \
-           --image=curlimages/curl \
-           -- \
-           curl -f http://spring-service:8089/student/Depatment/getAllDepartment
-       '''
-     }
-   }
-
+    stage('Post-deploy smoke test') {
+      steps {
+        sh """
+          kubectl -n ${NAMESPACE} delete pod curl-test --ignore-not-found
+          kubectl -n ${NAMESPACE} run curl-test \
+            --rm -i --restart=Never \
+            --image=curlimages/curl \
+            -- \
+            curl -f http://spring-service:8089/student/Depatment/getAllDepartment
+        """
+      }
+    }
+  }
 
   post {
     always {
