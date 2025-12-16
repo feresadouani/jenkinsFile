@@ -126,7 +126,7 @@ pipeline {
     }
 
     /* ========================= */
-    /*   SMOKE TEST (PRO)        */
+    /*   POST-DEPLOY SMOKE TEST  */
     /* ========================= */
     stage('Post-deploy smoke test') {
       steps {
@@ -137,22 +137,20 @@ pipeline {
             --rm -i --restart=Never \
             --image=curlimages/curl \
             -- sh -c '
-              echo "Waiting for Spring Boot to be ready...";
               for i in \$(seq 1 30); do
-                if curl -f http://spring-service:8089/student/Depatment/getAllDepartment; then
-                  echo "✅ Smoke test passed";
-                  exit 0;
+                echo "curl http://spring-service:8089/student/Depatment/getAllDepartment"
+                RESULT=\$(curl -s http://spring-service:8089/student/Depatment/getAllDepartment)
+                if [ \$? -eq 0 ]; then
+                  echo "\$RESULT"
+                  exit 0
                 fi
-                echo "⏳ Not ready yet... retry \$i";
-                sleep 2;
+                sleep 2
               done
-              echo "❌ Smoke test failed after timeout";
-              exit 1;
+              exit 1
             '
         """
       }
     }
-
   }
 
   post {
