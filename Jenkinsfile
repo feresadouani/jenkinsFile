@@ -108,6 +108,7 @@ pipeline {
           if [ -n "$POD" ]; then
             kubectl -n ${NAMESPACE} exec $POD -- \
               curl -sS http://127.0.0.1:8089/student/Depatment/getAllDepartment
+
           else
             echo "No spring-app pod found"
           fi
