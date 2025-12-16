@@ -131,7 +131,7 @@ pipeline {
           MINIKUBE_IP=$(minikube ip)
           echo "Minikube IP: $MINIKUBE_IP"
 
-          curl -sS http://$MINIKUBE_IP:8089/student/Depatment/getAllDepartment \
+          curl -sS http://$MINIKUBE_IP:30080/student/Depatment/getAllDepartment \
             || echo "Smoke test failed"
         '''
       }
